@@ -1,7 +1,8 @@
 name: Build FFmpeg Android ARM32 - Full Features
 
 on:
-  workflow_dispatch:        # Manual trigger
+  workflow_dispatch:        
+  # Manual trigger
   push:
     branches: [ main, master ]
   schedule:

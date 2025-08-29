@@ -542,8 +542,8 @@ jobs:
         All major codecs, filters, and features included.
         Perfect for professional media processing applications.
         
-EOF
-        
+        EOF       
+
         # Create usage examples
         cat > release/EXAMPLES.py << EOF
 #!/usr/bin/env python3
@@ -713,3 +713,4 @@ EOF
           echo "💡 This is expected for complex builds - check logs"
           echo "🔧 Consider reducing external libraries if needed"
         fi
+

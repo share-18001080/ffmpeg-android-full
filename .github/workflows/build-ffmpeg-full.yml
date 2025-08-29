@@ -1,4 +1,4 @@
-name: Build FFmpeg Android ARM32 (Full-Features)
+name: Build FFmpeg Android ARM32 (Full Features)
 
 on:
   workflow_dispatch:
@@ -9,168 +9,175 @@ permissions:
   contents: read
   actions: read
 
-env:
-  ANDROID_API_LEVEL: 21
-  ANDROID_ABI: armeabi-v7a
-  NDK_VERSION: r25c
-  FFMPEG_VERSION: n7.1
-
 jobs:
   build-ffmpeg-full:
     runs-on: ubuntu-latest
-    timeout-minutes: 240
+    timeout-minutes: 360
+
+    env:
+      ANDROID_API_LEVEL: 21
+      ANDROID_ABI: armeabi-v7a
+      NDK_VERSION: r25c
+      FFMPEG_VERSION: n7.1
 
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
+    - name: Checkout
+      uses: actions/checkout@v4
 
-      - name: Setup Java JDK 17
-        uses: actions/setup-java@v4
-        with:
-          distribution: temurin
-          java-version: 17
+    - name: Setup Java JDK 17
+      uses: actions/setup-java@v4
+      with:
+        distribution: 'temurin'
+        java-version: '17'
 
-      - name: Setup Android NDK r25c
-        uses: nttld/setup-ndk@v1
-        id: setup-ndk
-        with:
-          ndk-version: r25c
-          add-to-path: true
-          local-cache: true
+    - name: Setup Android NDK r25c
+      uses: nttld/setup-ndk@v1
+      id: setup-ndk
+      with:
+        ndk-version: r25c
+        add-to-path: true
+        local-cache: true
 
-      - name: Install dependencies
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y \
-            build-essential \
-            yasm \
-            nasm \
-            pkg-config \
-            autoconf \
-            automake \
-            libtool \
-            git \
-            wget \
-            curl
+    - name: Install Build Dependencies
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y \
+          build-essential yasm nasm pkg-config autoconf automake libtool git wget curl
 
-      - name: Clone FFmpeg official repository
-        run: |
-          git clone --depth 1 --branch ${{ env.FFMPEG_VERSION }} https://git.ffmpeg.org/ffmpeg.git ffmpeg
-          cd ffmpeg
-          echo "FFmpeg version: $(cat VERSION)"
-          echo "Commit: $(git rev-parse HEAD)"
+    - name: Clone FFmpeg Official
+      run: |
+        git clone --depth 1 --branch ${{ env.FFMPEG_VERSION }} https://git.ffmpeg.org/ffmpeg.git ffmpeg
+        cd ffmpeg
+        echo "FFmpeg VERSION: $(cat VERSION)"
+        echo "Commit: $(git rev-parse HEAD)"
+        ls -la
 
-      - name: Setup NDK env
-        run: |
-          echo "ANDROID_NDK_HOME=${{ steps.setup-ndk.outputs.ndk-path }}" >> $GITHUB_ENV
-          echo "ANDROID_NDK_ROOT=${{ steps.setup-ndk.outputs.ndk-path }}" >> $GITHUB_ENV
+    - name: Prepare Dirs
+      run: |
+        mkdir -p build/armeabi-v7a output/armeabi-v7a logs
 
-      - name: Create build directories
-        run: |
-          mkdir -p build/armeabi-v7a
-          mkdir -p output/armeabi-v7a
-          mkdir -p logs
+    - name: Configure FFmpeg (Full Features)
+      working-directory: ffmpeg
+      run: |
+        export ANDROID_NDK_HOME=${{ steps.setup-ndk.outputs.ndk-path }}
+        export TOOLCHAIN=$ANDROID_NDK_HOME/toolchains/llvm/prebuilt/linux-x86_64
+        export CC=$TOOLCHAIN/bin/armv7a-linux-androideabi21-clang
+        export CXX=$TOOLCHAIN/bin/armv7a-linux-androideabi21-clang++
+        export STRIP=$TOOLCHAIN/bin/armv7a-linux-androideabi21-strip
+        export AR=$TOOLCHAIN/bin/llvm-ar
+        export RANLIB=$TOOLCHAIN/bin/llvm-ranlib
+        export SYSROOT=$TOOLCHAIN/sysroot
 
-      - name: Configure FFmpeg (full-features)
-        working-directory: ffmpeg
-        run: |
-          export ANDROID_NDK_HOME=${{ steps.setup-ndk.outputs.ndk-path }}
-          TOOLCHAIN=$ANDROID_NDK_HOME/toolchains/llvm/prebuilt/linux-x86_64
-          CC=$TOOLCHAIN/bin/armv7a-linux-androideabi21-clang
-          CXX=$TOOLCHAIN/bin/armv7a-linux-androideabi21-clang++
-          STRIP=$TOOLCHAIN/bin/armv7a-linux-androideabi21-strip
-          AR=$TOOLCHAIN/bin/llvm-ar
-          RANLIB=$TOOLCHAIN/bin/llvm-ranlib
-          SYSROOT=$TOOLCHAIN/sysroot
+        # Lưu ý: KHÔNG dùng --disable-everything để tránh thiếu muxer ảnh (image2/mjpeg)
+        ./configure \
+          --prefix=../build/armeabi-v7a \
+          --logfile=../logs/config.log \
+          --arch=arm \
+          --target-os=android \
+          --enable-cross-compile \
+          --cc=$CC \
+          --cxx=$CXX \
+          --strip=$STRIP \
+          --ar=$AR \
+          --ranlib=$RANLIB \
+          --sysroot=$SYSROOT \
+          --cpu=armv7-a \
+          --extra-cflags="-fPIC -DANDROID -march=armv7-a -mfloat-abi=softfp -mfpu=vfpv3-d16 -mthumb" \
+          --extra-ldflags="-Wl,--fix-cortex-a8 -L$SYSROOT/usr/lib -lc -lm -ldl" \
+          --pkg-config-flags="--static" \
+          --enable-static \
+          --disable-shared \
+          --enable-ffmpeg \
+          --enable-ffplay \
+          --enable-ffprobe \
+          --enable-gpl \
+          --enable-version3 \
+          --enable-nonfree \
+          --enable-avdevice \
+          --enable-avcodec \
+          --enable-avformat \
+          --enable-avfilter \
+          --enable-swscale \
+          --enable-swresample \
+          --enable-postproc \
+          --enable-filters \
+          --enable-parsers \
+          --enable-bsfs \
+          --enable-protocols \
+          --enable-indevs \
+          --enable-outdevs \
+          --enable-muxers \
+          --enable-demuxers \
+          --enable-hwaccels \
+          \
+          # Bật thêm các muxer/encoder ảnh phổ biến để xuất thumbnail
+          --enable-muxer=image2 \
+          --enable-muxer=mjpeg \
+          --enable-encoder=mjpeg \
+          --enable-muxer=png \
+          --enable-encoder=png \
+          \
+          # Tuỳ chọn dung lượng: có thể bỏ disable-* để bật tối đa
+          --disable-doc
 
-          ./configure \
-            --prefix=../build/armeabi-v7a \
-            --logfile=../logs/config.log \
-            --arch=arm \
-            --target-os=android \
-            --enable-cross-compile \
-            --cc=$CC \
-            --cxx=$CXX \
-            --strip=$STRIP \
-            --ar=$AR \
-            --ranlib=$RANLIB \
-            --sysroot=$SYSROOT \
-            --cpu=armv7-a \
-            --extra-cflags="-fPIC -DANDROID -march=armv7-a -mfloat-abi=softfp -mfpu=vfpv3-d16 -mthumb" \
-            --extra-ldflags="-Wl,--fix-cortex-a8 -L$SYSROOT/usr/lib -lc -lm -ldl" \
-            --pkg-config-flags="--static" \
-            --disable-shared \
-            --enable-static \
-            --disable-doc \
-            --disable-htmlpages \
-            --disable-manpages \
-            --disable-podpages \
-            --disable-txtpages \
-            --enable-programs \
-            --enable-ffmpeg \
-            --enable-ffplay \
-            --enable-ffprobe \
-            --enable-avdevice \
-            --enable-avfilter \
-            --enable-swscale \
-            --enable-swresample \
-            --enable-network \
-            --enable-bzlib \
-            --enable-iconv \
-            --enable-libxcb \
-            --enable-lzma \
-            --enable-zlib \
-            --enable-securetransport \
-            --enable-libx264 \
-            --enable-libx265 \
-            --enable-libvpx \
-            --enable-libfreetype \
-            --enable-libmp3lame \
-            --enable-libopus \
-            --enable-libvorbis \
-            --enable-libass \
-            --enable-libfdk-aac \
-            --enable-openssl \
-            --enable-libxvid \
-            --enable-libwebp \
-            --enable-libtheora \
-            --enable-libopenjpeg \
-            --enable-libspeex \
-            --enable-libbluray \
-            --enable-gpl \
-            --enable-nonfree \
-            --enable-small \
-            --enable-decoder=all \
-            --enable-encoder=all \
-            --enable-muxer=all \
-            --enable-demuxer=all \
-            --enable-parser=all \
-            --enable-protocol=all \
-            --enable-filter=all \
-            --enable-bsf=all
+        echo "CONFIGURE OK"
 
-      - name: Show config log on failure
-        if: failure()
-        run: |
-          echo "===== CONFIG LOG ====="
-          cat logs/config.log
+    - name: Show Config Log if failed
+      if: failure()
+      run: |
+        echo "===== CONFIG LOG START ====="
+        cat logs/config.log || echo "No config.log found"
+        echo "===== CONFIG LOG END ====="
+        cd ffmpeg && ./configure --help | head -100 || true
 
-      - name: Build FFmpeg
-        working-directory: ffmpeg
-        run: |
-          export ANDROID_NDK_HOME=${{ steps.setup-ndk.outputs.ndk-path }}
-          make -j$(nproc)
-          cp ffmpeg ../output/armeabi-v7a/
+    - name: Build FFmpeg
+      working-directory: ffmpeg
+      run: |
+        make -j1 V=1
+        ls -la ffmpeg ffprobe ffplay || true
+        file ffmpeg || true
+        cp ffmpeg ../output/armeabi-v7a/
+        cp ffprobe ../output/armeabi-v7a/ || true
+        cp ffplay ../output/armeabi-v7a/ || true
 
-      - name: Verify binary
-        run: |
-          file output/armeabi-v7a/ffmpeg
-          du -h output/armeabi-v7a/ffmpeg
+    - name: Verify Binary
+      run: |
+        ls -la output/armeabi-v7a/
+        file output/armeabi-v7a/ffmpeg
+        du -sh output/armeabi-v7a/ffmpeg || true
+        readelf -h output/armeabi-v7a/ffmpeg | grep -E "(Class|Data|Machine|Entry)" || true
+        readelf -d output/armeabi-v7a/ffmpeg | grep NEEDED || echo "Static binary - likely no dynamic deps"
 
-      - name: Upload artifacts
-        uses: actions/upload-artifact@v4
-        with:
-          name: ffmpeg-android-full-armeabi-v7a
-          path: |
-            output/armeabi-v7a/ffmpeg
-            logs/config.log
+    - name: Package
+      run: |
+        mkdir -p release
+        cp output/armeabi-v7a/ffmpeg release/
+        [ -f output/armeabi-v7a/ffprobe ] && cp output/armeabi-v7a/ffprobe release/ || true
+        [ -f output/armeabi-v7a/ffplay ] && cp output/armeabi-v7a/ffplay release/ || true
+
+        cat > release/BUILD_INFO.txt << EOF
+        FFmpeg Android Full Build
+        Version: ${{ env.FFMPEG_VERSION }}
+        Arch: armeabi-v7a
+        API: 21+
+        Static: yes
+        Built: $(date -u)
+        Commit: $(cd ffmpeg && git rev-parse HEAD)
+        EOF
+
+        (cd release && zip -9 ffmpeg-android-armeabi-v7a-full.zip ffmpeg ffprobe ffplay BUILD_INFO.txt 2>/dev/null || zip -9 ffmpeg-android-armeabi-v7a-full.zip ffmpeg BUILD_INFO.txt)
+
+        ls -la release
+
+    - name: Upload Artifacts
+      uses: actions/upload-artifact@v4
+      with:
+        name: ffmpeg-android-armeabi-v7a-full
+        path: |
+          release/ffmpeg-android-armeabi-v7a-full.zip
+          release/ffmpeg
+          release/ffprobe
+          release/ffplay
+          release/BUILD_INFO.txt
+          logs/config.log
+        retention-days: 30

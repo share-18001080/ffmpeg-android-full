@@ -424,7 +424,7 @@ jobs:
         cp output/armeabi-v7a/* release/ 2>/dev/null || true
         
         # Create comprehensive build info
-        cat > release/FULL_BUILD_INFO.txt << 'EOF'
+        cat > release/FULL_BUILD_INFO.txt << EOF
         FFmpeg Android Full Featured Build
         ==================================
         
@@ -545,7 +545,7 @@ jobs:
 EOF
         
         # Create usage examples
-        cat > release/EXAMPLES.py << 'EOF'
+        cat > release/EXAMPLES.py << EOF
 #!/usr/bin/env python3
 """
 FFmpeg Full Featured - Usage Examples for Pydroid3

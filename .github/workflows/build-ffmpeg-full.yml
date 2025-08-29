@@ -1,4 +1,4 @@
-name: Build FFmpeg Android ARM32  , Full Features
+name: Build FFmpeg Android ARM32 Full Features
 
 on:
   workflow_dispatch:        

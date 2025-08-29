@@ -713,3 +713,4 @@ EOF
           echo "💡 This is expected for complex builds - check logs"
           echo "🔧 Consider reducing external libraries if needed"
         fi
+

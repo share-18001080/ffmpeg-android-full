@@ -548,10 +548,10 @@ jobs:
         cat > release/EXAMPLES.py << EOF
 #!/usr/bin/env python3
 """
+
 FFmpeg Full Featured - Usage Examples for Pydroid3
 ==================================================
 """
-
 import subprocess
 import os
 import json
@@ -713,4 +713,5 @@ EOF
           echo "💡 This is expected for complex builds - check logs"
           echo "🔧 Consider reducing external libraries if needed"
         fi
+
 
